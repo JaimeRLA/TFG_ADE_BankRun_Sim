@@ -3,25 +3,38 @@ import plotly.graph_objects as go
 import networkx as nx
 import pandas as pd
 import numpy as np
+import time
 from simulation.model import BancoModel
 
-st.set_page_config(page_title="CaixaBank Stress Test Lab v2", layout="wide")
+st.set_page_config(page_title="Stress Test Lab v2", layout="wide")
+
 
 # --- SIDEBAR: CONFIGURACIÓN ---
 st.sidebar.header("🛡️ Parámetros de la Crisis")
 score = st.sidebar.slider("Gravedad de la Noticia", 0.0, 1.0, 0.8)
 validez = st.sidebar.slider("Credibilidad del Medio", 0.0, 1.0, 0.9)
 difusion = st.sidebar.slider("% Difusión Inicial (Alcance)", 0.0, 1.0, 0.4)
+# Añade esto en la sección de configuración de la sidebar
+st.sidebar.header("⏱️ Control de Simulación")
+velocidad = st.sidebar.slider("Segundos por turno", 0.0, 2.0, 0.5)
+max_turnos = st.sidebar.slider("Turnos máximos", 5, 500, 150)
 
 st.sidebar.header("👥 Estructura de la Población")
-n_agentes = st.sidebar.slider("Nº Total de Nodos (Red)", 50, 400, 200)
+n_agentes = st.sidebar.slider("Nº Total de Nodos (Red)", 50, 1000, 200)
 p_externos = st.sidebar.slider("% de No-Clientes (Propagadores)", 0.0, 0.5, 0.2)
-liq_input = st.sidebar.number_input("Liquidez Bancaria Inicial (€)", value=2000000)
+
+# --- SIDEBAR ---
+st.sidebar.header("💰 Estructura Bancaria")
+dep_input = st.sidebar.number_input("Depósitos Totales de Clientes (€)", value=10000000)
+# Podrías añadir un slider para que el usuario elija el encaje legal (liquidez)
+encaje = st.sidebar.slider("% Liquidez Inmediata)", 0.01, 0.20, 0.10)
+liq_input=dep_input*encaje
+
 
 # --- EJECUCIÓN ---
 if st.button("🚀 Lanzar Simulación Small-World"):
     # Inicializamos el modelo con los nuevos parámetros
-    model = BancoModel(n_agentes, liq_input, score, validez, difusion, p_no_clientes=p_externos)
+    model = BancoModel(n_agentes, dep_input,encaje, score, validez, difusion, p_no_clientes=p_externos)
     
     # Layout fijo para evitar que el grafo salte
     pos = nx.spring_layout(model.G, seed=42) 
@@ -41,7 +54,11 @@ if st.button("🚀 Lanzar Simulación Small-World"):
     }
 
     # --- BUCLE DE SIMULACIÓN ---
-    for t in range(50):
+    stats_data["prestamos"] = [] # Añadir a tu diccionario de stats
+    for t in range(max_turnos):
+        # ... dentro del for t in range(150):
+        prestamos = model.prestamos_activos
+        stats_data["prestamos"].append(prestamos)
         model.step()
         
         agentes = model.schedule.agents
@@ -67,23 +84,50 @@ if st.button("🚀 Lanzar Simulación Small-World"):
 
         # 2. Dibujar Nodos (Agentes)
         node_x, node_y, colors, text, sizes = [], [], [], [], []
+
         for a in agentes:
             x, y = pos[a.unique_id]
-            node_x.append(x); node_y.append(y)
+            node_x.append(x)
+            node_y.append(y)
             
-            # Lógica de colores:
-            if a.tipo == "No-Cliente":
-                colors.append("#FFD700" if a.estado == "ALERTA" else "#4F4F4F") # Dorado (Alerta) o Gris
-                sizes.append(9)
+            # --- NUEVA JERARQUÍA DE COLORES ---
+            if a.estado == "RETIRADO":
+                color = "#FF0000"  # ROJO: Ya han huido
+            elif a.alcance_noticia:
+                color = "#FF8C00"  # NARANJA: Sabe la noticia pero sigue en el banco
             else:
-                colors.append("#FF0000" if a.estado == "RETIRADO" else "#00FF7F") # Rojo o Verde
-                sizes.append(13)
+                color = "#00FF7F"  # VERDE: No sabe nada / Está en calma
             
-            text.append(f"ID: {a.unique_id} | {a.tipo}<br>Estado: {a.estado}<br>Saldo: {a.saldo:,.0f}€")
+            # Distinción visual para No-Clientes (más pequeños o con borde diferente)
+            if a.tipo == "No-Cliente":
+                sizes.append(9)
+                # Si es No-cliente y está en ALERTA, lo marcamos naranja fuerte
+                if a.estado == "ALERTA": color = "#FFA500" 
+            else:
+                sizes.append(13)
+                
+            colors.append(color)
+            # Calculamos el grado (número de conexiones) del nodo actual
+            num_conexiones = len(list(model.G.neighbors(a.unique_id)))
 
-        node_trace = go.Scatter(x=node_x, y=node_y, mode='markers', hoverinfo='text', text=text,
-                                marker=dict(color=colors, size=sizes, line_width=1.5, line=dict(color='white')))
+            text.append(
+                f"ID: {a.unique_id} | {a.tipo}<br>"
+                f"Conexiones: {num_conexiones}<br>"  # <--- NUEVO
+                f"Edad: {a.edad} | Estado: {a.estado}<br>"
+                f"Saldo: {round(a.saldo,2)} <br>"
+                f"Sabe noticia: {'Sí' if a.alcance_noticia else 'No'}"
+            )
+        node_trace = go.Scatter(
+            x=node_x, y=node_y, mode='markers', hoverinfo='text', text=text,
+            marker=dict(
+                color=colors, 
+                size=sizes, 
+                line_width=1.5, 
+                line=dict(color='white')
+            )
+        )
 
+        
         # 3. Renderizar Grafo
         fig = go.Figure(data=[edge_trace, node_trace],
                          layout=go.Layout(
@@ -95,17 +139,70 @@ if st.button("🚀 Lanzar Simulación Small-World"):
                          ))
         
         placeholder_grafo.plotly_chart(fig, use_container_width=True)
+
+        
         
         # 4. Gráfica de Liquidez lateral
-        df_plot = pd.DataFrame({"Paso": stats_data["paso"], "Liquidez": stats_data["liquidez"]})
-        fig_liq = go.Figure()
-        fig_liq.add_trace(go.Scatter(x=df_plot["Paso"], y=df_plot["Liquidez"], name="Liquidez", line=dict(color="#FF0000")))
-        fig_liq.update_layout(title="Fuga de Depósitos", template="plotly_dark", height=300)
-        placeholder_metricas.plotly_chart(fig_liq, use_container_width=True)
+        # --- 4. ACTUALIZACIÓN DE MÉTRICAS LATERALES ---
+        with placeholder_metricas.container():
+            # A. Gráfico de Barras del Balance (Solvencia vs Liquidez)
+            # Mostramos cuánto queda en caja frente a lo que está prestado
+            fig_balance = go.Figure(data=[
+                go.Bar(name='Caja (Liquidez)', x=['Estado'], y=[liq_actual], marker_color='#00FF7F'),
+                go.Bar(name='Préstamos (Activos)', x=['Estado'], y=[prestamos], marker_color='#555555')
+            ])
+            fig_balance.update_layout(
+                barmode='stack', 
+                title="Balance de Activos (€)", 
+                template="plotly_dark", 
+                height=300,
+                showlegend=True,
+                margin=dict(l=20, r=20, t=40, b=20)
+            )
+            st.plotly_chart(fig_balance, use_container_width=True)
+
+            # B. Gráfico de Evolución de Liquidez (Histórico)
+            df_plot = pd.DataFrame({
+                "Paso": stats_data["paso"], 
+                "Liquidez": stats_data["liquidez"]
+            })
+            
+            fig_liq = go.Figure()
+            fig_liq.add_trace(go.Scatter(
+                x=df_plot["Paso"], 
+                y=df_plot["Liquidez"], 
+                name="Efectivo disponible", 
+                fill='tozeroy', # Rellena el área debajo de la línea
+                line=dict(color="#FF0000", width=2)
+            ))
+            fig_liq.update_layout(
+                title="Fuga de Depósitos (Caja)", 
+                template="plotly_dark", 
+                height=300,
+                margin=dict(l=20, r=20, t=40, b=20),
+                xaxis_title="Turno",
+                yaxis_title="€"
+            )
+            st.plotly_chart(fig_liq, use_container_width=True)
+
+        # Control de velocidad y parada
+        time.sleep(velocidad)
 
         if liq_actual <= 0:
             st.error("🚨 QUIEBRA TÉCNICA: Reservas Agotadas.")
+            # Opcional: podrías poner liq_actual = 0 para que el gráfico no muestre negativos
             break
+
+
+    # Leyenda rápida debajo del grafo
+    st.markdown("""
+    <div style="display: flex; justify-content: space-around; font-weight: bold; padding: 10px; background-color: #1e1e1e; border-radius: 10px;">
+        <span style="color: #00FF7F;">● Sin Información (Verde)</span>
+        <span style="color: #FF8C00;">● Informado / Alerta (Naranja)</span>
+        <span style="color: #FF0000;">● Dinero Retirado (Rojo)</span>
+    </div>
+    """, unsafe_allow_html=True)
+
 
     # --- SECCIÓN DE ESTADÍSTICAS FINALES ---
     st.markdown("---")
@@ -130,6 +227,8 @@ if st.button("🚀 Lanzar Simulación Small-World"):
         "Han Retirado Dinero": stats_data["clientes_huidos"],
         "No-Clientes en Alerta": stats_data["no_clientes_alerta"]
     })
+
+    
     
     fig_final = go.Figure()
     fig_final.add_trace(go.Scatter(x=df_final["Turno"], y=df_final["Conocen la Noticia"], name="Alcance Noticia", line=dict(dash='dash')))
@@ -140,3 +239,17 @@ if st.button("🚀 Lanzar Simulación Small-World"):
     st.plotly_chart(fig_final, use_container_width=True)
 
     st.info("💡 **Interpretación del TFG:** La brecha entre la línea de 'Alcance Noticia' y 'Retiradas Reales' representa la inercia del cliente. El papel de los 'No-Clientes' es actuar como catalizadores que cierran esa brecha mediante la presión social en la red Small-World.")
+
+    # En el bloque de "ESTADÍSTICAS FINALES" de tu app principal
+    st.subheader("📊 Perfil Demográfico de la Red")
+    edades = [a.edad for a in model.schedule.agents]
+    fig_hist = go.Figure(data=[go.Histogram(x=edades, nbinsx=20, marker_color='#00FF7F')])
+    fig_hist.update_layout(
+        title="Distribución de Edades de los Agentes",
+        xaxis_title="Edad",
+        yaxis_title="Cantidad de Personas",
+        template="plotly_dark"
+    )
+    st.plotly_chart(fig_hist, use_container_width=True)
+
+    
