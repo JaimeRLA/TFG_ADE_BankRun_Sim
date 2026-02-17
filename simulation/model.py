@@ -29,6 +29,9 @@ class BancoModel(Model):
         self.grid = NetworkGrid(self.G)
         self.schedule = RandomActivation(self)
 
+        self.poblacion_objetivo = 3000000
+        self.representacion_por_nodo = self.poblacion_objetivo / n
+
         # --- CREACIÓN DE AGENTES (CLÚSTERES) ---
         n_clientes_estimados = n * (1 - p_no_clientes)
         

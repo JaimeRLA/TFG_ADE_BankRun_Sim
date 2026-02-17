@@ -4,7 +4,19 @@
 EDAD_MEDIA = 50
 EDAD_DESVIACION = 18
 EDAD_MINIMA = 18
-EDAD_MAXIMA = 95
+EDAD_MAXIMA = 90
+DISTRIBUCION_SEXO = ["H", "M"]
+PROBABILIDADES_SEXO = [0.5, 0.5]
+FACTOR_H=1.1
+FACTOR_M=1
+
+# --- FONDO DE GARANTÍA DE DEPÓSITOS (FGD) ---
+UMBRAL_FGD = 100000  # Límite de protección en España (€)
+REDUCCION_PANICO_FGD = 0.5  # Los protegidos tienen la mitad de miedo
+
+# --- FIDELIDAD (COSTES DE CAMBIO) ---
+# Representa años de antigüedad o vinculación (hipoteca, nómina)
+RANGO_FIDELIDAD = (0.1, 0.3) # 0.1: nuevo cliente, 0.9: cliente muy fiel
 
 # --- LÓGICA DE SALDOS (€) ---
 SALDO_RETAIL_RANGO = (1000, 15000)
@@ -14,12 +26,12 @@ PROBABILIDADES_TIPOS = [0.75, 0.20, 0.05]
 
 # --- UMBRALES DE COMPORTAMIENTO ---
 # Parámetros cliente
-k_ruido_cliente = 10 
-x0_ruido_cliente = 0.4
+K_RUIDO_CLIENTE = 10 
+x0_CLIENTE = 0.4
 
 # Parámetros no cliente
-k_ruido_no_cliente = 12 
-x0_no_cliente = 0.45 
+K_RUIDO_NO_CLIENTE = 12 
+x0_NO_CLIENTE = 0.45 
 
 # --- PESOS DE LA DECISIÓN (Suman 1.0) ---
 PESO_NOTICIA = 0.4   # Impacto de los medios

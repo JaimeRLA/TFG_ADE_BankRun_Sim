@@ -10,6 +10,7 @@ class ClienteCaixa(Agent):
         # --- LÓGICA DE CLÚSTER ---
         self.saldo_inicial = saldo  # El 100% del dinero del grupo
         self.saldo = saldo          # Lo que queda actualmente en el banco
+        self.saldo_por_persona = self.saldo_inicial / self.model.representacion_por_nodo
         self.porcentaje_retirado = 0.0 # De 0.0 a 1.0
         self.tipo = tipo
         
@@ -18,7 +19,11 @@ class ClienteCaixa(Agent):
         self.digitalizacion = 1.0 - (self.edad / p.EDAD_MAXIMA)
         factor_generacional = (self.edad / p.EDAD_MAXIMA) * 0.5
         self.aversion = np.clip(self.random.uniform(0.2, 0.8) + factor_generacional, 0, 1)
+        self.sexo = self.random.choices(p.DISTRIBUCION_SEXO, p.PROBABILIDADES_SEXO)[0]
+        self.fidelidad = self.random.uniform(p.RANGO_FIDELIDAD[0], p.RANGO_FIDELIDAD[1])
+        self.protegido_fgd = self.saldo_por_persona <= p.UMBRAL_FGD
         self.alcance_noticia = False
+
 
     def step(self):
         # 1. DIFUSIÓN (Común)
@@ -48,22 +53,24 @@ class ClienteCaixa(Agent):
             score_opinion = np.clip(score_opinion, 0, 1)
 
             # Su 'porcentaje_retirado' NO es dinero, es su 'Nivel de Escándalo'
-            self.porcentaje_retirado = 1 / (1 + np.exp(-p.k_ruido_cliente * (score_opinion - p.x0_ruido_cliente)))
+            self.porcentaje_retirado = 1 / (1 + np.exp(-p.K_RUIDO_NO_CLIENTE * (score_opinion - p.x0_NO_CLIENTE)))
             return
 
         # 4. LÓGICA PARA CLIENTES 
         impacto_noticia = self.model.noticia_score * self.model.noticia_validez if self.alcance_noticia else 0
         miedo_banco = 1.0 - (self.model.liquidez_banco / self.model.liquidez_inicial)
+        factor_proteccion = p.REDUCCION_PANICO_FGD if self.protegido_fgd else 1.2 # El no protegido se asusta un 20% más
+        factor_sexo = p.FACTOR_M if self.sexo == "M" else p.FACTOR_H
         
         score_final = (
             impacto_noticia * p.PESO_NOTICIA + 
             fuga_vecinos * p.PESO_SOCIAL + 
             miedo_banco * p.PESO_LIQUIDEZ
-        ) * (1 + self.aversion)
+        ) * (1 + self.aversion) * factor_proteccion * factor_sexo
         
+        score_final = score_final * (1 - (1*self.fidelidad)) # Reduce hasta un 30% el pánico si es muy fiel
         score_final = np.clip(score_final, 0, 1)
-        
-        meta_fuga = 1 / (1 + np.exp(-p.k_ruido_no_cliente * (score_final - p.x0_no_cliente)))
+        meta_fuga = 1 / (1 + np.exp(-p.K_RUIDO_CLIENTE * (score_final - p.x0_CLIENTE)))
         
         if meta_fuga > self.porcentaje_retirado:
             self.ejecutar_retirada_progresiva(meta_fuga)
