@@ -13,12 +13,15 @@ DISTRIBUCION_TIPOS = ["Retail", "VIP", "Empresa"]
 PROBABILIDADES_TIPOS = [0.75, 0.20, 0.05]
 
 # --- UMBRALES DE COMPORTAMIENTO ---
-# Cuanto más bajo el umbral, más fácil es que entren en pánico
-UMBRAL_RETIRADA_CLIENTE = 0.5
-UMBRAL_ALERTA_NOCLIENTE = 0.4
+# Parámetros cliente
+k_ruido_cliente = 10 
+x0_ruido_cliente = 0.4
+
+# Parámetros no cliente
+k_ruido_no_cliente = 12 
+x0_no_cliente = 0.45 
 
 # --- PESOS DE LA DECISIÓN (Suman 1.0) ---
-# Define qué influye más en el cliente
 PESO_NOTICIA = 0.4   # Impacto de los medios
 PESO_SOCIAL = 0.5    # Lo que hacen sus vecinos (efecto rebaño)
 PESO_LIQUIDEZ = 0.1  # Salud financiera real del banco

@@ -12,14 +12,12 @@ class ClienteCaixa(Agent):
         self.saldo = saldo          # Lo que queda actualmente en el banco
         self.porcentaje_retirado = 0.0 # De 0.0 a 1.0
         self.tipo = tipo
-        edad_random = self.random.gauss(50, 15) 
-        self.edad = int(np.clip(edad_random, 18, 90))
         
         # Parámetros de comportamiento
+        self.edad = int(np.clip(self.random.gauss(p.EDAD_MEDIA, p.EDAD_DESVIACION) , 18, 90))
         self.digitalizacion = 1.0 - (self.edad / p.EDAD_MAXIMA)
         factor_generacional = (self.edad / p.EDAD_MAXIMA) * 0.5
         self.aversion = np.clip(self.random.uniform(0.2, 0.8) + factor_generacional, 0, 1)
-        self.estado = "NEUTRAL"
         self.alcance_noticia = False
 
     def step(self):
@@ -27,6 +25,9 @@ class ClienteCaixa(Agent):
         if not self.alcance_noticia:
             if self.random.random() < (self.model.noticia_difusion * self.digitalizacion):
                 self.alcance_noticia = True
+        
+        if not self.alcance_noticia:
+            return
 
         # 2. CONTAGIO SOCIAL (Los vecinos miran cuánto pánico hay alrededor)
         vecinos_ids = list(self.model.G.neighbors(self.pos))
@@ -47,18 +48,10 @@ class ClienteCaixa(Agent):
             score_opinion = np.clip(score_opinion, 0, 1)
 
             # Su 'porcentaje_retirado' NO es dinero, es su 'Nivel de Escándalo'
-            k_ruido = 10 
-            x0_ruido = 0.4
-            self.porcentaje_retirado = 1 / (1 + np.exp(-k_ruido * (score_opinion - x0_ruido)))
-
-            # ESTO ES LO QUE ACTIVA EL CONTADOR:
-            if self.porcentaje_retirado > 0.1: # Si el rumor supera el 10% de intensidad
-                self.estado = "ALERTA"
-            else:
-                self.estado = "NEUTRAL"
+            self.porcentaje_retirado = 1 / (1 + np.exp(-p.k_ruido_cliente * (score_opinion - p.x0_ruido_cliente)))
             return
 
-        # 4. LÓGICA PARA CLIENTES (Sigue igual, ellos sí retiran)
+        # 4. LÓGICA PARA CLIENTES 
         impacto_noticia = self.model.noticia_score * self.model.noticia_validez if self.alcance_noticia else 0
         miedo_banco = 1.0 - (self.model.liquidez_banco / self.model.liquidez_inicial)
         
@@ -69,10 +62,8 @@ class ClienteCaixa(Agent):
         ) * (1 + self.aversion)
         
         score_final = np.clip(score_final, 0, 1)
-
-        k = 12 
-        x0 = 0.45 
-        meta_fuga = 1 / (1 + np.exp(-k * (score_final - x0)))
+        
+        meta_fuga = 1 / (1 + np.exp(-p.k_ruido_no_cliente * (score_final - p.x0_no_cliente)))
         
         if meta_fuga > self.porcentaje_retirado:
             self.ejecutar_retirada_progresiva(meta_fuga)
@@ -92,8 +83,4 @@ class ClienteCaixa(Agent):
             self.saldo -= monto_real
             self.porcentaje_retirado += (monto_real / self.saldo_inicial)
             
-            # 5. ACTUALIZACIÓN VISUAL DEL ESTADO (Para el color en app.py)
-            if self.porcentaje_retirado > 0.8:
-                self.estado = "RETIRADO" # Bola Roja (Casi vacío)
-            elif self.porcentaje_retirado > 0.1:
-                self.estado = "ALERTA"   # Bola Naranja (Fuga en curso)
+ 

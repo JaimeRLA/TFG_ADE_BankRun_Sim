@@ -8,6 +8,7 @@ from simulation.model import BancoModel
 
 st.set_page_config(page_title="Stress Test Lab v2 - Human Impact", layout="wide")
 
+
 # --- FUNCIONES AUXILIARES ---
 def get_color_fuga(agente):
     """
@@ -132,6 +133,7 @@ if st.button("Lanzar Simulación Progresiva"):
         # No-Clientes en Alarma (Propagadores)
         # En lugar de buscar el estado "ALERTA" exacto, contamos por intensidad real
         alerta_nocl = sum(1 for a in agentes if a.tipo == "No-Cliente" and a.porcentaje_retirado > 0.05)
+  
         intensidad_rumor = (sum(a.porcentaje_retirado for a in agentes if a.tipo == "No-Cliente") / 
                             sum(1 for a in agentes if a.tipo == "No-Cliente")) if p_externos > 0 else 0
 
@@ -201,11 +203,9 @@ if st.button("Lanzar Simulación Progresiva"):
         # 2. Métricas Laterales (Recuperando el gráfico de Evolución de Caja)
         with placeholder_metricas.container():
             st.metric("Clientes que han huido", f"{int(personas_huidas):,}")
-            st.metric("Alcance Poblacional", f"{personas_informadas / poblacion_objetivo}")
+            st.metric("Alcance Poblacional", f"{(personas_informadas / poblacion_objetivo)*100:.1f}%")
             st.metric("Intensidad Rumor Externo", f"{intensidad_rumor*100:.1f}%")
         
-
-            
             # --- RECUPERACIÓN DEL GRÁFICO ANTERIOR: EVOLUCIÓN DE CAJA ---
             df_hist = pd.DataFrame({
                 "Turno": stats_data["paso"], 
@@ -231,12 +231,11 @@ if st.button("Lanzar Simulación Progresiva"):
             )
             st.plotly_chart(fig_liq, use_container_width=True)
             
-            # Nota para el TFG sobre solvencia (opcional, para mantener el rigor)
             st.caption(f"Activos Ilíquidos (Préstamos): {model.prestamos_activos:,.0f} €")
 
         time.sleep(velocidad)
         if liq_actual <= 0:
-            st.error("🚨 QUIEBRA TÉCNICA: El banco se ha quedado sin efectivo.")
+            st.error("QUIEBRA TÉCNICA: El banco se ha quedado sin efectivo.")
             break
 
     # --- ESTADÍSTICAS FINALES ---
@@ -258,4 +257,4 @@ if st.button("Lanzar Simulación Progresiva"):
     fig_final.update_layout(title="Dinámica Social: Información vs Acción", yaxis_title="Número de Personas", template="plotly_dark")
     st.plotly_chart(fig_final, use_container_width=True)
 
-    st.info(f"💡 **Interpretación TFG:** El modelo escalado muestra que el banco colapsa cuando aproximadamente {int(personas_huidas)} clientes retiran sus fondos, movidos por una red de desconfianza donde la opinión pública (No-Clientes) alcanzó una intensidad del {intensidad_rumor*100:.1f}%.")
+    st.info(f"El modelo escalado muestra que el banco colapsa cuando aproximadamente {int(personas_huidas)} clientes retiran sus fondos, movidos por una red de desconfianza donde la opinión pública (No-Clientes) alcanzó una intensidad del {intensidad_rumor*100:.1f}%.")

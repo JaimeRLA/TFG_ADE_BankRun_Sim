@@ -25,7 +25,6 @@ class BancoModel(Model):
         self.noticia_difusion = news_difusion
 
         # --- RED SOCIAL (SMALL WORLD) ---
-        # Representa la interconexión entre los 800 clústeres
         self.G = nx.powerlaw_cluster_graph(n, 3, 0.5)
         self.grid = NetworkGrid(self.G)
         self.schedule = RandomActivation(self)

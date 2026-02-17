@@ -90,3 +90,5 @@ Aquí se construye el mapa de relaciones entre los agentes. Se utiliza un grafo 
 
 
 
+
+
