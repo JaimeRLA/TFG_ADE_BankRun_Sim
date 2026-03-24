@@ -16,7 +16,7 @@ REDUCCION_PANICO_FGD = 0.5  # Los protegidos tienen la mitad de miedo
 
 # --- FIDELIDAD (COSTES DE CAMBIO) ---
 # Representa años de antigüedad o vinculación (hipoteca, nómina)
-RANGO_FIDELIDAD = (0.1, 0.3) # 0.1: nuevo cliente, 0.9: cliente muy fiel
+RANGO_FIDELIDAD = (0.1, 0.9) # 0.1: nuevo cliente, 0.9: cliente muy fiel
 
 # --- LÓGICA DE SALDOS (€) ---
 SALDO_RETAIL_RANGO = (1000, 15000)
